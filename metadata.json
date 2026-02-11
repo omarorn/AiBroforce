@@ -1,0 +1,6 @@
+{
+  "name": "AI Broforce: Recharged",
+  "description": "A side-scrolling run-and-gun platformer, inspired by Broforce, where you can generate modern heroes and villains using the Gemini AI. Enter a theme, and the AI will create your cast of characters for an epic battle!",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -11,21 +12,94 @@
     <style>
       body {
         font-family: 'Press Start 2P', cursive;
+        background-color: #111;
+        overflow: hidden; /* Prevent scroll bars from CRT effects */
       }
+
+      /* CRT Scanline Effect */
+      .scanlines::before {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+        z-index: 50;
+        background-size: 100% 2px, 3px 100%;
+        pointer-events: none;
+      }
+      
+      .vignette::after {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.6) 100%);
+        z-index: 50;
+        pointer-events: none;
+      }
+
+      /* Textures */
+      .bg-dirt-pattern {
+        background-color: #3f2e18;
+        background-image: 
+          linear-gradient(45deg, #4a3b22 25%, transparent 25%), 
+          linear-gradient(-45deg, #4a3b22 25%, transparent 25%), 
+          linear-gradient(45deg, transparent 75%, #4a3b22 75%), 
+          linear-gradient(-45deg, transparent 75%, #4a3b22 75%);
+        background-size: 20px 20px;
+        background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        image-rendering: pixelated;
+      }
+
+      .bg-metal-pattern {
+        background-color: #555;
+        background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, #444 10px, #444 20px);
+      }
+      
+      .bg-sky-scrolling {
+        background-color: #3b82f6;
+        background-image: 
+            radial-gradient(white 15%, transparent 16%),
+            radial-gradient(white 15%, transparent 16%);
+        background-size: 60px 60px;
+        background-position: 0 0, 30px 30px;
+        animation: sky-scroll 0.5s linear infinite;
+      }
+
+      @keyframes sky-scroll {
+        0% { background-position: 0 0, 30px 30px; }
+        100% { background-position: 0 -60px, 30px -30px; }
+      }
+      
+      @keyframes float-tumble {
+        0% { transform: rotate(-5deg) translateY(0); }
+        50% { transform: rotate(5deg) translateY(15px); }
+        100% { transform: rotate(-5deg) translateY(0); }
+      }
+      .animate-tumble {
+        animation: float-tumble 3s ease-in-out infinite;
+      }
+
       @keyframes explosion-animation {
-        0% { transform: scale(0.5); opacity: 1; }
-        50% { transform: scale(1.5); opacity: 0.7; }
-        100% { transform: scale(2); opacity: 0; }
+        0% { transform: scale(0.5); opacity: 1; filter:  hue-rotate(0deg); }
+        50% { transform: scale(1.5); opacity: 0.8; filter: hue-rotate(45deg); }
+        100% { transform: scale(2); opacity: 0; filter: hue-rotate(90deg); }
       }
       .explosion-anim {
         animation: explosion-animation 0.3s ease-out forwards;
       }
       @keyframes flash-damage {
-        0% { filter: brightness(2); }
+        0% { filter: brightness(10) sepia(1) hue-rotate(-50deg) saturate(5); }
         100% { filter: brightness(1); }
       }
       .flash-damage {
-        animation: flash-damage 0.2s linear;
+        animation: flash-damage 0.15s steps(2);
       }
     </style>
   <script type="importmap">
@@ -40,8 +114,8 @@
 }
 </script>
 </head>
-  <body class="bg-gray-900 text-white">
-    <div id="root"></div>
+  <body class="bg-gray-900 text-white scanlines vignette">
+    <div id="root" class="h-screen w-screen flex flex-col"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

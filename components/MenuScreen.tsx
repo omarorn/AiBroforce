@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { GeneratedCharacters, CharacterProfile, SavedCast } from '../types';
 import { generateCharacters, generateCharacterImage, generateMissionBriefing } from '../services/geminiService';
@@ -5,7 +6,7 @@ import { audioService } from '../services/audioService';
 import { storageService } from '../services/storageService';
 import Button from './ui/Button';
 import Input from './ui/Input';
-import Loader from './ui/Loader';
+import RotatingLoader from './ui/RotatingLoader';
 import CharacterProfileScreen from './CharacterProfileScreen';
 import { IoVolumeHighOutline } from 'react-icons/io5';
 
@@ -13,7 +14,7 @@ interface MenuScreenProps {
   onStartGame: (characters: GeneratedCharacters, startingHero: CharacterProfile) => void;
 }
 
-type View = 'generate' | 'casting' | 'review' | 'portraits' | 'briefing' | 'casting_couch' | 'edit_character';
+type View = 'generate' | 'recruiting' | 'review' | 'edit_character' | 'casting_couch' | 'briefing';
 
 const themeSuggestions = [
   'famous action movie',
@@ -31,209 +32,189 @@ const getRandomTheme = () => {
     return `Silly doppelgangers of ${randomPart} heroes and villains`;
 };
 
-// --- START: Placeholder data for slot machine animation ---
-const placeholderNames = ['Action Hero', 'Tough Guy', 'Commando', 'Super Soldier', 'Villain', 'Bad Dude', 'Dr. Evil', 'Rogue Agent', 'Mercenary'];
-const placeholderWeapons = ['Big Gun', 'Sharp Thing', 'Boom Stick', 'Laser Blaster', 'Plasma Rifle', 'Chain Gun', 'Rocket Pod'];
-const placeholderDescriptions = [
-    "A lone wolf with a mysterious past.",
-    "They're the best there is at what they do.",
-    "Justice is coming, and it's heavily armed.",
-    "Ready to save the world, one explosion at a time.",
-    "An unstoppable force of pure chaos.",
-];
-const placeholderSpecials = ['Mega Bomb', 'Rage Mode', 'Stealth Cloak', 'Sentry Gun', 'Orbital Strike'];
-const placeholderMoves = ['Grapple Hook', 'Teleport', 'Super Jump', 'Jetpack Burst', 'Phase Shift'];
-const placeholderCatchphrases = [
-    "Let's get dangerous.",
-    "I have a bad feeling about this.",
-    "It's showtime!",
-    "They messed with the wrong bro.",
-    "This is gonna be a blast.",
-];
-// --- END: Placeholder data ---
-
 const CharacterCard: React.FC<{
   character: CharacterProfile;
   onClick?: () => void;
-  isCycling?: boolean;
-}> = ({ character, onClick, isCycling = false }) => {
-  const [displayChar, setDisplayChar] = useState(character);
-
-  useEffect(() => {
-      if (!isCycling) {
-          setDisplayChar(character);
-          return;
-      }
-      
-      const interval = setInterval(() => {
-          setDisplayChar(prev => ({
-              ...prev,
-              name: placeholderNames[Math.floor(Math.random() * placeholderNames.length)],
-              description: placeholderDescriptions[Math.floor(Math.random() * placeholderDescriptions.length)],
-              weaponType: placeholderWeapons[Math.floor(Math.random() * placeholderWeapons.length)],
-              specialAbility: placeholderSpecials[Math.floor(Math.random() * placeholderSpecials.length)],
-              movementAbility: placeholderMoves[Math.floor(Math.random() * placeholderMoves.length)],
-              catchphrase: placeholderCatchphrases[Math.floor(Math.random() * placeholderCatchphrases.length)],
-          }));
-      }, 100);
-
-      return () => clearInterval(interval);
-  }, [isCycling, character]);
-
+  small?: boolean;
+  savedImages: string[];
+}> = ({ character, onClick, small=false, savedImages }) => {
 
   const handleSpeak = (e: React.MouseEvent) => {
     e.stopPropagation();
-    audioService.speak(displayChar.catchphrase);
+    audioService.speak(character.catchphrase);
   };
 
   return (
     <div
       onClick={onClick}
-      className={`bg-gray-800 border-2 border-gray-700 p-4 transition-all duration-200 flex flex-col ${onClick ? 'cursor-pointer hover:border-yellow-400 hover:scale-105' : ''}`}
+      className={`bg-gray-800 border-2 border-gray-600 p-2 transition-all duration-200 flex flex-col relative group ${onClick ? 'cursor-pointer hover:border-yellow-400 hover:scale-105' : ''} ${small ? 'w-32 h-48' : 'h-full min-h-[250px]'}`}
     >
-      {displayChar.imageUrl ? (
-        <img src={displayChar.imageUrl} alt={displayChar.name} className="w-full h-40 object-contain mb-2 bg-gray-600" />
+      <div className="absolute inset-0 bg-black/10 pointer-events-none group-hover:bg-transparent"></div>
+      
+      {character.imageUrl ? (
+        <img src={character.imageUrl} alt={character.name} className="w-full h-1/2 object-contain mb-2 bg-gray-900 pixel-art" style={{imageRendering: 'pixelated'}} />
       ) : (
-        <div className="w-full h-40 bg-gray-700 flex items-center justify-center mb-2">
-          <div className="text-gray-500 text-6xl">?</div>
+        <div className="w-full h-1/2 mb-2">
+            <RotatingLoader images={savedImages} size="sm" className="w-full h-full" />
         </div>
       )}
-      <div className="flex-grow">
-        <div className="flex justify-between items-center gap-2">
-          <h3 className="text-sm sm:text-lg font-bold uppercase">{displayChar.name}</h3>
-          <span className="text-xs bg-yellow-400 text-gray-900 font-bold px-2 py-1 rounded whitespace-nowrap truncate">
-            {displayChar.weaponType}
-          </span>
-        </div>
-        <p className="text-xs sm:text-sm text-gray-400 mt-2 h-10 overflow-hidden">{displayChar.description}</p>
-        
-        <div className="flex items-center justify-between mt-2 gap-2">
-          <p className="text-xs text-cyan-400 italic flex-grow truncate">"{displayChar.catchphrase}"</p>
-          <button
-              onClick={handleSpeak}
-              className="p-1 rounded-full hover:bg-yellow-500/50 transition-colors"
-              aria-label={`Say catchphrase: ${displayChar.catchphrase}`}
-          >
-              <IoVolumeHighOutline className="text-white h-4 w-4"/>
-          </button>
-        </div>
-
-        <p className="text-xs text-purple-400 mt-1 truncate">Move: {displayChar.movementAbility}</p>
-        <p className="text-xs text-yellow-500 mt-1 truncate">Special: {displayChar.specialAbility}</p>
+      
+      <div className="flex-grow flex flex-col overflow-hidden">
+        <h3 className={`${small ? 'text-xs' : 'text-sm'} font-bold uppercase text-yellow-400 truncate leading-tight`}>{character.name}</h3>
+        {!small && (
+             <>
+                <span className="text-[10px] bg-red-900/50 text-gray-200 px-1 rounded mt-1 truncate">
+                    {character.weaponType}
+                </span>
+                <p className="text-[10px] text-gray-400 mt-1 line-clamp-2 leading-tight">{character.description}</p>
+                <div className="mt-auto pt-2 flex justify-between items-center">
+                    <span className="text-[10px] text-cyan-400 truncate">"{character.catchphrase}"</span>
+                    <button onClick={handleSpeak} className="p-1 hover:text-white"><IoVolumeHighOutline /></button>
+                </div>
+             </>
+        )}
       </div>
     </div>
   )
 };
 
+const ConsoleLog: React.FC<{logs: string[]}> = ({logs}) => {
+    const endRef = useRef<HTMLDivElement>(null);
+    useEffect(() => endRef.current?.scrollIntoView({behavior:'smooth'}), [logs]);
+
+    return (
+        <div className="bg-black/90 text-green-500 font-mono text-xs p-4 h-full overflow-y-auto border-2 border-green-800 shadow-[inset_0_0_20px_rgba(0,50,0,0.5)]">
+            {logs.map((log, i) => <div key={i} className="mb-1">{`> ${log}`}</div>)}
+            <div ref={endRef} />
+        </div>
+    )
+}
+
 const MenuScreen: React.FC<MenuScreenProps> = ({ onStartGame }) => {
   const [view, setView] = useState<View>('generate');
-  const [characters, setCharacters] = useState<GeneratedCharacters | null>(null);
-  const [editingCharacter, setEditingCharacter] = useState<CharacterProfile | null>(null);
-
+  
+  // State for Generation Process
   const [theme, setTheme] = useState<string>(getRandomTheme());
-  const [characterCount, setCharacterCount] = useState<number>(9);
+  const [characterCount, setCharacterCount] = useState<number>(4);
+  const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [loadingMessage, setLoadingMessage] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
+  // Final Data
+  const [characters, setCharacters] = useState<GeneratedCharacters | null>(null);
   
+  // Recruiting State (Lineup)
+  const [recruitedHeroes, setRecruitedHeroes] = useState<CharacterProfile[]>([]);
+  const [recruitedVillains, setRecruitedVillains] = useState<CharacterProfile[]>([]);
+  const [currentRecruitingId, setCurrentRecruitingId] = useState<number | null>(null);
+  const [cachedImages, setCachedImages] = useState<string[]>([]);
+
+  // Edit/Manage State
+  const [editingCharacter, setEditingCharacter] = useState<CharacterProfile | null>(null);
   const [savedCasts, setSavedCasts] = useState<SavedCast[]>([]);
-  const [slideshowIndex, setSlideshowIndex] = useState(0);
-  
   const [currentCastName, setCurrentCastName] = useState<string | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState<boolean>(false);
   const saveInputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    audioService.playMusic('music_menu');
     setSavedCasts(storageService.loadCasts());
-    return () => audioService.stopMusic();
+    setCachedImages(storageService.getAllCharacterImages());
   }, []);
-  
-  useEffect(() => {
-      if (view !== 'portraits' || !characters) return;
-      const allChars = [...characters.heroes, ...characters.villains];
-      const interval = setInterval(() => {
-          setSlideshowIndex(prev => (prev + 1) % allChars.length);
-      }, 3000);
-      return () => clearInterval(interval);
-  }, [view, characters]);
 
-  const handleGenerateCharacters = async () => {
-    if (!theme.trim() || characterCount <= 0) {
-      setError('Please enter a theme and a valid character count.');
-      return;
-    }
-    setError(null);
-    setView('casting');
-    setLoadingMessage('Casting your action stars...');
+  const addLog = (msg: string) => setConsoleLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${msg}`]);
+
+  const startRecruitment = async () => {
+    if (!theme.trim()) return;
+    setView('recruiting');
+    setConsoleLogs([]);
+    setRecruitedHeroes([]);
+    setRecruitedVillains([]);
+    addLog(`INITIALIZING RECRUITMENT PROTOCOL...`);
+    addLog(`THEME: ${theme}`);
+    addLog(`TARGET SQUAD SIZE: ${characterCount}`);
 
     try {
-      const newChars = await generateCharacters(theme, characterCount);
-      if (newChars.heroes.length === 0) {
-        throw new Error("The AI didn't generate any heroes. Try a different theme!");
-      }
-      setCharacters(newChars);
-      setCurrentCastName(null);
-      setView('review');
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred. Please try again.');
-      setView('generate');
-    }
-  };
-  
-  const handleGeneratePortraits = async () => {
-      if (!characters) return;
-      setView('portraits');
-      setLoadingMessage('Generating epic portraits...');
+        // 1. Generate Text
+        addLog(`CONTACTING GEMINI HQ FOR DOSSIERS...`);
+        const data = await generateCharacters(theme, characterCount);
+        addLog(`DOSSIERS RECEIVED. ${data.heroes.length} HEROES, ${data.villains.length} VILLAINS.`);
+        
+        // 2. Initialize placeholders
+        setRecruitedHeroes(data.heroes); 
+        setRecruitedVillains(data.villains);
+        
+        const allChars = [...data.heroes, ...data.villains];
+        const fullyRecruited: CharacterProfile[] = [];
 
-      const allChars = [...characters.heroes, ...characters.villains];
-      const imagePromises = allChars.map(char =>
-        generateCharacterImage(char)
-          .then(imageUrl => ({ id: char.id, imageUrl }))
-          .catch(err => {
-            console.error(`Failed to generate image for ${char.name}:`, err.message);
-            return { id: char.id, imageUrl: null }; // Fail gracefully
-          })
-      );
+        // 3. Sequential Image Generation (The Lineup)
+        for (const char of allChars) {
+            setCurrentRecruitingId(char.id);
+            addLog(`GENERATING VISUALS FOR: ${char.name.toUpperCase()}...`);
+            
+            try {
+                const imageUrl = await generateCharacterImage(char);
+                addLog(`VISUALS ACQUIRED FOR ${char.name}.`);
+                
+                // Update specific character in state to trigger re-render
+                const updatedChar = { ...char, imageUrl };
+                
+                if (data.heroes.find(h => h.id === char.id)) {
+                    setRecruitedHeroes(prev => prev.map(h => h.id === char.id ? updatedChar : h));
+                    audioService.playSound('powerup');
+                } else {
+                    setRecruitedVillains(prev => prev.map(v => v.id === char.id ? updatedChar : v));
+                    audioService.playSound('shoot_shotgun');
+                }
+                fullyRecruited.push(updatedChar);
 
-      const results = await Promise.all(imagePromises);
-
-      const finalCharacters: GeneratedCharacters = JSON.parse(JSON.stringify(characters));
-      results.forEach(result => {
-        if (result.imageUrl) {
-          const { id, imageUrl } = result;
-          let character = finalCharacters.heroes.find(c => c.id === id) || finalCharacters.villains.find(c => c.id === id);
-          if (character) character.imageUrl = imageUrl;
+            } catch (err) {
+                addLog(`ERROR GENERATING IMAGE FOR ${char.name}: ${err}`);
+                fullyRecruited.push(char); // Keep character even if image fails
+            }
         }
-      });
-      
-      setCharacters(finalCharacters);
-      handleGenerateBriefing(finalCharacters);
-  };
-  
-  const handleGenerateBriefing = async (currentCast: GeneratedCharacters) => {
-      setView('briefing');
-      setLoadingMessage('Generating mission briefing...');
-      const briefing = await generateMissionBriefing(currentCast);
-      setCharacters(chars => chars ? ({...chars, missionBriefing: briefing}) : null);
+
+        addLog(`RECRUITMENT COMPLETE.`);
+        
+        // 4. Mission Briefing Sequence (Skydiving)
+        setView('briefing');
+        audioService.playSound('dash'); // Whoosh sound for transition
+
+        // Filter arrays locally to ensure we pass complete data to briefing gen
+        const finalHeroes = fullyRecruited.filter(c => data.heroes.some(h => h.id === c.id));
+        const finalVillains = fullyRecruited.filter(c => data.villains.some(v => v.id === c.id));
+        
+        // Minimum animation time of 4 seconds so user sees the skydiving
+        const animationDelay = new Promise(resolve => setTimeout(resolve, 5000));
+        const briefingPromise = generateMissionBriefing({ heroes: finalHeroes, villains: finalVillains });
+
+        // Wait for both animation time and API call
+        const [_, briefing] = await Promise.all([animationDelay, briefingPromise]);
+
+        const finalData = { 
+            heroes: finalHeroes, 
+            villains: finalVillains,
+            missionBriefing: briefing
+        };
+
+        setCharacters(finalData);
+        setView('review');
+
+    } catch (e: any) {
+        addLog(`CRITICAL ERROR: ${e.message}`);
+        setError(e.message);
+    }
   };
 
   const handleLaunchGame = () => {
-      if (!characters || characters.heroes.length === 0) {
-          setError("Cannot start game without heroes!");
-          setView('generate');
-          return;
-      }
-      const startingHero = characters.heroes[Math.floor(Math.random() * characters.heroes.length)];
-      onStartGame(characters, startingHero);
+    if (!characters || characters.heroes.length === 0) return;
+    const startingHero = characters.heroes[Math.floor(Math.random() * characters.heroes.length)];
+    onStartGame(characters, startingHero);
   };
 
   const handleEditCharacter = (char: CharacterProfile) => {
-      setEditingCharacter(char);
-      setView('edit_character');
+    setEditingCharacter(char);
+    setView('edit_character');
   };
-  
+
   const handleSaveCharacter = (updatedChar: CharacterProfile) => {
     if (!characters) return;
     const newCharacters: GeneratedCharacters = JSON.parse(JSON.stringify(characters));
@@ -247,16 +228,13 @@ const MenuScreen: React.FC<MenuScreenProps> = ({ onStartGame }) => {
         }
     }
     setCharacters(newCharacters);
-    
-    // Auto-save if it's an existing, named cast
     if (currentCastName) {
         storageService.saveCast(currentCastName, newCharacters);
     }
-
     setView('review');
     setEditingCharacter(null);
   };
-
+  
   const handleSaveNewCast = (name: string) => {
       if(characters && name.trim()) {
           storageService.saveCast(name.trim(), characters);
@@ -279,188 +257,231 @@ const MenuScreen: React.FC<MenuScreenProps> = ({ onStartGame }) => {
       }
   };
 
-  const renderContent = () => {
-    switch (view) {
-        case 'casting':
-            const placeholderChar: CharacterProfile = {id:0, name:'', description:'', weaponType:'', specialAbility:'', movementAbility:'', catchphrase:''};
-            return (
-                <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
-                    <h2 className="text-3xl text-yellow-400 mb-6 uppercase animate-pulse">{loadingMessage}</h2>
-                    <div className="w-full max-w-6xl grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                        {Array.from({length: 5}).map((_, i) => <CharacterCard key={i} character={placeholderChar} isCycling={true} />)}
-                    </div>
-                </div>
-            )
+  // --- Render Functions ---
+
+  const renderGenerate = () => (
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+        <h1 className="text-5xl md:text-6xl text-yellow-400 drop-shadow-[4px_4px_0_#9A3412] mb-4 font-bold tracking-tighter">AI BROFORCE</h1>
+        <h2 className="text-xl md:text-2xl bg-gray-700 text-white inline-block px-4 py-1 mb-8 transform -skew-x-12 border-2 border-white">RECHARGED</h2>
         
-        case 'review':
-             if (!characters) return null;
-             return (
-                 <div className="min-h-screen bg-gray-900 flex flex-col items-center p-4">
-                     <div className="w-full max-w-7xl mx-auto text-center">
-                         <h1 className="text-3xl md:text-4xl text-yellow-400 my-4 uppercase">{currentCastName || 'Your New Cast'}</h1>
-                         <div className="flex justify-center gap-4 mb-6">
-                            <Button onClick={handleGeneratePortraits} className="!bg-green-600 hover:!bg-green-700 text-lg">Generate Portraits & Continue</Button>
-                            <Button onClick={() => setIsSaveModalOpen(true)} className="!bg-purple-600 hover:!bg-purple-700 text-lg">
-                                {currentCastName ? 'Save As...' : 'Save Cast'}
-                            </Button>
-                         </div>
-                         <h2 className="text-xl text-white mb-2">Heroes</h2>
-                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-                             {characters.heroes.map(c => <CharacterCard key={c.id} character={c} onClick={() => handleEditCharacter(c)} />)}
-                         </div>
-                         <h2 className="text-xl text-white mb-2">Villains</h2>
-                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-                            {characters.villains.map(c => <CharacterCard key={c.id} character={c} onClick={() => handleEditCharacter(c)} />)}
-                         </div>
-                     </div>
-                 </div>
-             )
-
-        case 'portraits':
-            if (!characters) return null;
-            const allChars = [...characters.heroes, ...characters.villains];
-            const currentChar = allChars[slideshowIndex];
-            return (
-                <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
-                    <h2 className="text-3xl text-yellow-400 mb-6 uppercase">{loadingMessage}</h2>
-                    {currentChar ? (
-                        <div className="flex flex-col items-center">
-                            <div className="w-full max-w-xs">
-                                <CharacterCard character={currentChar} />
-                            </div>
-                            <p className="mt-4 text-gray-400">{slideshowIndex + 1} / {allChars.length}</p>
-                        </div>
-                    ) : <Loader />}
-                </div>
-            );
-            
-        case 'briefing':
-            if (!characters) return null;
-            return (
-                <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
-                    <div className="w-full max-w-2xl mx-auto text-center bg-gray-800/50 p-8 border-4 border-gray-700">
-                        <h1 className="text-3xl md:text-4xl text-yellow-400 mb-6 uppercase">Mission Briefing</h1>
-                        <p className="text-lg text-white leading-relaxed mb-8">
-                           {characters.missionBriefing || <Loader />}
-                        </p>
-                        <Button onClick={handleLaunchGame} disabled={!characters.missionBriefing} className="!bg-red-600 hover:!bg-red-700 text-2xl">
-                            LAUNCH MISSION
-                        </Button>
+        <div className="bg-gray-800/80 p-8 border-4 border-gray-600 max-w-4xl w-full backdrop-blur-sm shadow-2xl">
+            <div className="flex flex-col gap-6">
+                <div>
+                    <label className="block text-left text-yellow-400 mb-2 uppercase text-sm">Operation Theme</label>
+                    <div className="flex gap-2">
+                        <Input 
+                            type="text" 
+                            value={theme} 
+                            onChange={(e) => setTheme(e.target.value)} 
+                            placeholder="e.g. 80s Action Stars"
+                            className="flex-grow"
+                        />
+                        <Button onClick={() => setTheme(getRandomTheme())} className="!py-2 text-sm !bg-blue-600">Random</Button>
                     </div>
                 </div>
-            );
-            
-        case 'edit_character':
-            if (!editingCharacter) return null;
-            return (
-                <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
-                    <CharacterProfileScreen 
-                        character={editingCharacter} 
-                        onSave={handleSaveCharacter} 
-                        onBack={() => setView('review')} 
-                    />
-                </div>
-            );
-            
-        case 'casting_couch':
-            return (
-                <div className="min-h-screen bg-gray-900 flex flex-col items-center p-4">
-                    <h1 className="text-3xl md:text-4xl text-yellow-400 my-6 uppercase">Casting Couch</h1>
-                    <div className="w-full max-w-4xl space-y-4">
-                        {savedCasts.length > 0 ? (
-                            savedCasts.map(cast => (
-                                <div key={cast.createdAt} className="bg-gray-800 p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-2 border-gray-700">
-                                    <div className="flex-grow">
-                                        <h2 className="text-xl text-white">{cast.name}</h2>
-                                        <p className="text-sm text-gray-400">
-                                            {cast.characters.heroes.length} Heroes, {cast.characters.villains.length} Villains - 
-                                            Saved on {new Date(cast.createdAt).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div className="flex gap-2 flex-shrink-0">
-                                        <Button onClick={() => handleLoadCast(cast)} className="!py-2">Load</Button>
-                                        <Button onClick={() => handleDeleteCast(cast.name)} className="!bg-red-800 hover:!bg-red-900 !py-2">Delete</Button>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-center text-gray-400 text-lg py-8">No saved casts yet. Go generate some!</p>
-                        )}
-                    </div>
-                    <Button onClick={() => setView('generate')} className="mt-8">Back to Menu</Button>
-                </div>
-            );
 
-        case 'generate':
-        default:
-          return (
-            <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
-              <div className="w-full max-w-4xl mx-auto text-center">
-                <h1 className="text-5xl md:text-6xl text-yellow-400 drop-shadow-[0_4px_0_#9A3412] mb-2">AI BROFORCE</h1>
-                <h2 className="text-xl md:text-2xl bg-gray-700 text-white inline-block px-4 py-1 mb-8">RECHARGED</h2>
-                
-                <div className="bg-gray-800/50 p-6 md:p-8 border-4 border-gray-700">
-                  <p className="mb-4 text-lg">Enter a theme, or use a random one!</p>
-                  <div className="flex flex-col md:flex-row gap-4 mb-4">
-                    <Input 
-                      type="text"
-                      value={theme}
-                      onChange={(e) => setTheme(e.target.value)}
-                      placeholder="e.g., Cyberpunk Ninjas, Space Vikings"
-                    />
-                     <Button onClick={() => setTheme(getRandomTheme())} className="!bg-blue-600 hover:!bg-blue-700">Random</Button>
-                  </div>
-                  <div className="flex flex-col md:flex-row gap-4 mb-6 items-center justify-center">
-                    <label htmlFor="char-count" className="text-lg">Number of Heroes/Villains:</label>
-                    <Input 
-                      id="char-count"
-                      type="number"
-                      value={characterCount}
-                      onChange={(e) => setCharacterCount(parseInt(e.target.value, 10) || 1)}
-                      className="!w-24 text-center"
-                      min="1"
-                      max="10"
-                    />
-                  </div>
-                  <Button onClick={handleGenerateCharacters} disabled={!theme.trim() || !characterCount} className="!bg-green-600 hover:!bg-green-700 text-xl px-8 py-4">
-                    Generate Cast
-                  </Button>
-                  {savedCasts.length > 0 && (
-                     <div className="mt-6">
-                        <Button onClick={() => setView('casting_couch')} className="!bg-purple-600 hover:!bg-purple-700">
-                            View Saved Casts ({savedCasts.length})
-                        </Button>
-                     </div>
-                  )}
-                  {error && <p className="text-red-500 mt-4">{error}</p>}
+                <div className="flex items-center justify-between bg-black/30 p-4 rounded">
+                    <label className="text-white uppercase text-sm">Squad Size</label>
+                    <div className="flex items-center gap-4">
+                        <input 
+                            type="range" 
+                            min="1" 
+                            max="8" 
+                            value={characterCount} 
+                            onChange={(e) => setCharacterCount(parseInt(e.target.value))} 
+                            className="w-48 accent-yellow-400"
+                        />
+                        <span className="text-2xl text-yellow-400 font-bold w-8">{characterCount}</span>
+                    </div>
                 </div>
-              </div>
+
+                <Button onClick={startRecruitment} className="!text-2xl !py-6 !bg-green-600 hover:!bg-green-500 hover:scale-[1.02] shadow-[0_4px_0_#14532d] active:shadow-none active:translate-y-1">
+                    INITIATE RECRUITMENT
+                </Button>
             </div>
-          );
-    }
-  }
+             {savedCasts.length > 0 && (
+                <div className="mt-8 pt-6 border-t border-gray-600">
+                    <Button onClick={() => setView('casting_couch')} className="!bg-purple-700 !text-sm w-full">Load Previous Operation</Button>
+                </div>
+            )}
+        </div>
+    </div>
+  );
 
-  return (
-    <>
-      {renderContent()}
-      {isSaveModalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 p-8 border-4 border-gray-700 max-w-sm w-full">
-                <h2 className="text-2xl text-yellow-400 mb-4">Save Your Cast</h2>
-                <Input
-                    type="text"
-                    placeholder="Enter cast name..."
-                    autoFocus
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveNewCast( (e.target as HTMLInputElement).value ) }}
-                    ref={saveInputRef}
-                />
-                <div className="flex justify-end gap-4 mt-6">
-                    <Button onClick={() => setIsSaveModalOpen(false)} className="!bg-gray-600 hover:!bg-gray-700 !py-2">Cancel</Button>
-                    <Button onClick={() => handleSaveNewCast(saveInputRef.current?.value || '')} className="!py-2">Save</Button>
+  const renderRecruiting = () => (
+      <div className="flex flex-col h-screen p-4 gap-4">
+          {/* Top Half: Console & Status */}
+          <div className="flex-grow basis-1/3 flex gap-4 min-h-0">
+               <div className="flex-grow h-full">
+                   <ConsoleLog logs={consoleLogs} />
+               </div>
+               <div className="w-1/3 h-full bg-gray-800 border-2 border-gray-600 p-4 flex flex-col items-center justify-center">
+                    {currentRecruitingId ? (
+                        <div className="text-center w-full h-full flex flex-col items-center justify-center">
+                            <RotatingLoader images={cachedImages} size="lg" className="mb-4" />
+                            <p className="text-yellow-400 text-xs animate-pulse">PROCESSING DNA...</p>
+                        </div>
+                    ) : (
+                        <div className="text-green-500 text-4xl">✓</div>
+                    )}
+               </div>
+          </div>
+
+          {/* Bottom Half: The Lineup */}
+          <div className="basis-2/3 bg-gray-800/50 border-t-4 border-yellow-500 p-4 overflow-x-auto flex flex-col">
+              <h3 className="text-white mb-2 uppercase text-xs tracking-widest">Recruited Assets</h3>
+              <div className="flex gap-4 items-end h-full">
+                  {/* Heroes */}
+                  {recruitedHeroes.map((hero, idx) => (
+                      <div key={`h-${idx}`} className={`transition-all duration-500 ${hero.imageUrl ? 'opacity-100 translate-y-0' : 'opacity-100 translate-y-0 grayscale'}`}>
+                          <CharacterCard character={hero} small savedImages={cachedImages} />
+                      </div>
+                  ))}
+                  <div className="w-px h-32 bg-gray-500 mx-4"></div>
+                   {/* Villains */}
+                   {recruitedVillains.map((villain, idx) => (
+                      <div key={`v-${idx}`} className={`transition-all duration-500 ${villain.imageUrl ? 'opacity-100 translate-y-0' : 'opacity-100 translate-y-0 grayscale'}`}>
+                          <CharacterCard character={villain} small savedImages={cachedImages} />
+                      </div>
+                  ))}
+              </div>
+          </div>
+      </div>
+  );
+
+  const renderBriefing = () => (
+      <div className="fixed inset-0 bg-blue-500 overflow-hidden flex flex-col items-center justify-center z-50">
+          {/* Wind lines / Speed effect */}
+          <div className="absolute inset-0 opacity-30 bg-sky-scrolling"></div>
+          
+          <h2 className="text-4xl text-white font-bold uppercase drop-shadow-[4px_4px_0_rgba(0,0,0,0.5)] mb-12 animate-pulse z-10 tracking-wider">Deploying Squad...</h2>
+          
+          <div className="flex gap-8 z-10">
+              {recruitedHeroes.map((hero, i) => (
+                  <div key={hero.id} className="relative animate-tumble" style={{animationDelay: `${i * 0.3}s`}}>
+                      <div className="w-32 h-40 bg-gray-800 border-4 border-white p-2 transform rotate-2 shadow-2xl flex flex-col items-center">
+                          {hero.imageUrl ? (
+                             <img src={hero.imageUrl} className="w-full h-full object-cover pixel-art" style={{imageRendering: 'pixelated'}} />
+                          ) : (
+                             <div className="w-full h-full bg-gray-700"></div>
+                          )}
+                          <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-yellow-300 text-[10px] px-2 py-1 whitespace-nowrap border border-white">
+                              {hero.name}
+                          </div>
+                      </div>
+                      {/* Wind streaks */}
+                      <div className="absolute -top-12 left-1/2 w-0.5 h-16 bg-white/40 -translate-x-1/2"></div>
+                      <div className="absolute -top-8 left-1/3 w-0.5 h-10 bg-white/40 -translate-x-1/2"></div>
+                      <div className="absolute -top-10 left-2/3 w-0.5 h-12 bg-white/40 -translate-x-1/2"></div>
+                  </div>
+              ))}
+          </div>
+
+          <div className="absolute bottom-10 z-20">
+              <div className="bg-black/70 border-2 border-green-500 text-green-400 font-mono text-xs p-4 rounded shadow-lg">
+                <span className="animate-pulse">_ RECEIVING MISSION DATA ENCRYPTED PACKET...</span>
+              </div>
+          </div>
+      </div>
+  );
+
+  const renderReview = () => {
+      if(!characters) return null;
+      return (
+        <div className="min-h-screen p-4 flex flex-col overflow-y-auto">
+            <div className="max-w-7xl mx-auto w-full">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8 bg-gray-800 p-4 border-b-4 border-yellow-500">
+                    <div>
+                        <h2 className="text-3xl text-yellow-400 uppercase font-bold">{currentCastName || 'UNNAMED SQUAD'}</h2>
+                        <p className="text-xs text-gray-400 mt-1">Ready for deployment</p>
+                    </div>
+                    <div className="flex gap-4 mt-4 md:mt-0">
+                         <Button onClick={() => setIsSaveModalOpen(true)} className="!bg-blue-600 !py-2 !text-sm">Save Squad</Button>
+                         <Button onClick={handleLaunchGame} className="!bg-red-600 !py-3 !text-lg animate-pulse">DEPLOY MISSION</Button>
+                    </div>
+                </div>
+
+                <div className="bg-gray-800/90 p-6 border-2 border-gray-600 mb-8">
+                     <h3 className="text-green-400 uppercase text-sm mb-2 border-b border-gray-600 pb-1">Mission Briefing</h3>
+                     <p className="text-white leading-relaxed font-mono text-sm">{characters.missionBriefing}</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 className="text-white uppercase bg-blue-900/50 p-2 mb-4 border-l-4 border-blue-500">Heroes</h3>
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                            {characters.heroes.map(c => <CharacterCard key={c.id} character={c} onClick={() => handleEditCharacter(c)} savedImages={cachedImages} />)}
+                        </div>
+                    </div>
+                    <div>
+                        <h3 className="text-white uppercase bg-red-900/50 p-2 mb-4 border-l-4 border-red-500">Threats</h3>
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                            {characters.villains.map(c => <CharacterCard key={c.id} character={c} onClick={() => handleEditCharacter(c)} savedImages={cachedImages} />)}
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="mt-12 text-center">
+                    <button onClick={() => setView('generate')} className="text-gray-500 hover:text-white underline text-sm">Dismiss Squad & Restart</button>
                 </div>
             </div>
         </div>
-      )}
+      );
+  }
+
+  // --- Main Render Switch ---
+
+  return (
+    <>
+        {view === 'generate' && renderGenerate()}
+        {view === 'recruiting' && renderRecruiting()}
+        {view === 'briefing' && renderBriefing()}
+        {view === 'review' && renderReview()}
+        {view === 'edit_character' && editingCharacter && (
+            <div className="min-h-screen flex items-center justify-center p-4">
+                <CharacterProfileScreen character={editingCharacter} onSave={handleSaveCharacter} onBack={() => setView('review')} savedImages={cachedImages} />
+            </div>
+        )}
+        {view === 'casting_couch' && (
+             <div className="min-h-screen p-8 flex flex-col items-center">
+                <h2 className="text-3xl text-yellow-400 mb-8 uppercase">Saved Operations</h2>
+                <div className="w-full max-w-4xl space-y-4">
+                    {savedCasts.map(cast => (
+                        <div key={cast.createdAt} className="bg-gray-800 p-4 border-2 border-gray-600 flex justify-between items-center hover:bg-gray-700">
+                             <div>
+                                <h3 className="text-xl text-white font-bold">{cast.name}</h3>
+                                <p className="text-xs text-gray-400">{new Date(cast.createdAt).toLocaleDateString()} • {cast.characters.heroes.length} Heroes</p>
+                             </div>
+                             <div className="flex gap-2">
+                                <Button onClick={() => handleLoadCast(cast)} className="!py-1 !text-sm">Load</Button>
+                                <Button onClick={() => handleDeleteCast(cast.name)} className="!py-1 !text-sm !bg-red-900">Delete</Button>
+                             </div>
+                        </div>
+                    ))}
+                    {savedCasts.length === 0 && <p className="text-gray-500">No saved data found.</p>}
+                </div>
+                <Button onClick={() => setView('generate')} className="mt-8">Back</Button>
+             </div>
+        )}
+
+        {isSaveModalOpen && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                <div className="bg-gray-800 p-6 border-4 border-yellow-500 max-w-sm w-full shadow-2xl">
+                    <h2 className="text-xl text-yellow-400 mb-4 uppercase">Operation Codename</h2>
+                    <Input
+                        type="text"
+                        placeholder="e.g. Alpha Squad"
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveNewCast( (e.target as HTMLInputElement).value ) }}
+                        ref={saveInputRef}
+                    />
+                    <div className="flex justify-end gap-2 mt-6">
+                        <Button onClick={() => setIsSaveModalOpen(false)} className="!bg-gray-600 !py-2 !text-xs">Cancel</Button>
+                        <Button onClick={() => handleSaveNewCast(saveInputRef.current?.value || '')} className="!py-2 !text-xs">Confirm</Button>
+                    </div>
+                </div>
+            </div>
+        )}
     </>
   );
 };

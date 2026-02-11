@@ -1,11 +1,10 @@
 
-
 import React, { useState } from 'react';
 import type { CharacterProfile } from '../types';
 import { generateCharacterImage } from '../services/geminiService';
 import { audioService } from '../services/audioService';
 import Button from './ui/Button';
-import Loader from './ui/Loader';
+import RotatingLoader from './ui/RotatingLoader';
 import Input from './ui/Input';
 import { IoVolumeHighOutline } from 'react-icons/io5';
 
@@ -13,9 +12,10 @@ interface InteractiveCharacterViewerProps {
     imageUrl: string | null;
     altText: string;
     isGenerating: boolean;
+    savedImages: string[];
 }
 
-const InteractiveCharacterViewer: React.FC<InteractiveCharacterViewerProps> = ({ imageUrl, altText, isGenerating }) => {
+const InteractiveCharacterViewer: React.FC<InteractiveCharacterViewerProps> = ({ imageUrl, altText, isGenerating, savedImages }) => {
     const [style, setStyle] = useState<React.CSSProperties>({});
     const [sheenStyle, setSheenStyle] = useState<React.CSSProperties>({});
 
@@ -59,11 +59,11 @@ const InteractiveCharacterViewer: React.FC<InteractiveCharacterViewerProps> = ({
             <div className="relative w-full h-full transform-style-3d" style={style}>
                 <div className="absolute inset-0 bg-gray-900 border-4 border-gray-600 flex items-center justify-center">
                     {isGenerating ? (
-                        <Loader />
+                        <RotatingLoader images={savedImages} size="lg" />
                     ) : !hasImage ? (
                         <span className="text-gray-500 text-6xl">?</span>
                     ) : null}
-                    {hasImage && <img src={imageUrl!} alt={altText} className="w-full h-full object-contain" />}
+                    {!isGenerating && hasImage && <img src={imageUrl!} alt={altText} className="w-full h-full object-contain" />}
                 </div>
                 <div className="absolute inset-0" style={sheenStyle}></div>
             </div>
@@ -76,9 +76,10 @@ interface CharacterProfileScreenProps {
   character: CharacterProfile;
   onSave: (updatedCharacter: CharacterProfile) => void;
   onBack: () => void;
+  savedImages?: string[];
 }
 
-const CharacterProfileScreen: React.FC<CharacterProfileScreenProps> = ({ character, onSave, onBack }) => {
+const CharacterProfileScreen: React.FC<CharacterProfileScreenProps> = ({ character, onSave, onBack, savedImages = [] }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [internalCharacter, setInternalCharacter] = useState<CharacterProfile>(character);
@@ -126,6 +127,7 @@ const CharacterProfileScreen: React.FC<CharacterProfileScreenProps> = ({ charact
             imageUrl={internalCharacter.imageUrl || null}
             altText={internalCharacter.name}
             isGenerating={isGenerating}
+            savedImages={savedImages}
         />
 
         <div className="bg-gray-900/50 p-4 space-y-4 text-left">

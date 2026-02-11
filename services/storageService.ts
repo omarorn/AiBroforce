@@ -1,3 +1,4 @@
+
 import type { GeneratedCharacters, SavedCast } from '../types';
 
 const CASTS_STORAGE_KEY = 'ai-broforce-casts';
@@ -43,6 +44,22 @@ class StorageService {
       localStorage.setItem(CASTS_STORAGE_KEY, JSON.stringify(casts));
     } catch (error) {
       console.error("Error deleting cast from local storage:", error);
+    }
+  }
+
+  public getAllCharacterImages(): string[] {
+    try {
+        const casts = this.loadCasts();
+        const images: string[] = [];
+        casts.forEach(cast => {
+            cast.characters.heroes.forEach(h => { if(h.imageUrl) images.push(h.imageUrl); });
+            cast.characters.villains.forEach(v => { if(v.imageUrl) images.push(v.imageUrl); });
+        });
+        // Shuffle images for better variety
+        return images.sort(() => 0.5 - Math.random());
+    } catch (error) {
+        console.error("Error retrieving images:", error);
+        return [];
     }
   }
 }

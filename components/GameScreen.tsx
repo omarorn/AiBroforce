@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { GeneratedCharacters, Player, Enemy, Bullet, Crate, Explosion, GameEntityType, CharacterProfile, RescueCage, Turret } from '../types';
 import { useGameLoop } from '../hooks/useGameLoop';
@@ -14,6 +15,19 @@ interface GameScreenProps {
   startingHero: CharacterProfile;
   onGameOver: (score: number) => void;
 }
+
+interface SpriteProps {
+  entity: GameEntityType;
+  color: string;
+  children?: React.ReactNode;
+  extraClasses?: string;
+}
+
+const Sprite: React.FC<SpriteProps> = ({ entity, color, children, extraClasses='' }) => (
+  <div className={`absolute overflow-hidden ${color} ${extraClasses}`} style={{left:entity.x, top:entity.y, width:entity.width, height:entity.height, transform: (entity.type === 'player' || entity.type === 'enemy') && entity.direction === 'left' ? 'scaleX(-1)' : 'scaleX(1)'}}>
+    {children}
+  </div>
+);
 
 const GameScreen: React.FC<GameScreenProps> = ({ characters, startingHero, onGameOver }) => {
   const nextObjectId = useRef(Date.now());
@@ -476,12 +490,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ characters, startingHero, onGam
     };
   }, []);
   
-  const Sprite = ({ entity, color, children, extraClasses='' } : {entity: GameEntityType, color: string, children?: React.ReactNode, extraClasses?: string}) => (
-    <div className={`absolute overflow-hidden ${color} ${extraClasses}`} style={{left:entity.x, top:entity.y, width:entity.width, height:entity.height, transform: (entity.type === 'player' || entity.type === 'enemy') && entity.direction === 'left' ? 'scaleX(-1)' : 'scaleX(1)'}}>
-      {children}
-    </div>
-  );
-  
   const PlayerSprite = () => {
     let classes = 'bg-transparent';
     if(player.isInvincible && !player.dashTimer) classes += ' opacity-50';
@@ -491,47 +499,58 @@ const GameScreen: React.FC<GameScreenProps> = ({ characters, startingHero, onGam
 
     return (
         <Sprite entity={player} color={classes} >
-          {player.hero.imageUrl && <img src={player.hero.imageUrl} alt={player.hero.name} className="w-full h-full object-contain" style={{transform: player.isWallSliding ? (player.direction === 'left' ? 'scaleX(1)' : 'scaleX(-1)') : ''}} />}
+          {player.hero.imageUrl && <img src={player.hero.imageUrl} alt={player.hero.name} className="w-full h-full object-contain" style={{imageRendering: 'pixelated', transform: player.isWallSliding ? (player.direction === 'left' ? 'scaleX(1)' : 'scaleX(-1)') : ''}} />}
           <div className="absolute -top-4 text-xs text-white whitespace-nowrap" style={{transform: player.direction === 'left' ? 'scaleX(-1)' : 'scaleX(1)'}}>{player.hero.name}</div>
         </Sprite>
     );
   }
 
+  const boss = enemies.find(e => e.isBoss);
+
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-black">
       <div style={{ width: C.GAME_WIDTH, height: C.GAME_HEIGHT, transform: `translate(${screenShake.x}px, ${screenShake.y}px)` }} className="relative bg-gradient-to-t from-gray-700 to-gray-800 overflow-hidden border-4 border-gray-600 transition-transform duration-75">
-        {crates.map(c => <Sprite key={c.id} entity={c} color="bg-yellow-900/80 border-2 border-yellow-900" />)}
+        {crates.map(c => <Sprite key={c.id} entity={c} color="bg-dirt-pattern border-2 border-yellow-900" />)}
         {cages.map(c => <Sprite key={c.id} entity={c} color="bg-gray-500/50 border-4 border-gray-400 flex items-center justify-center text-3xl text-white">?</Sprite>)}
         
         <PlayerSprite />
 
         {enemies.map(e => <Sprite key={e.id} entity={e} color={e.isBoss ? 'bg-transparent' : 'bg-transparent'} extraClasses={e.damageFlash > 0 ? 'flash-damage' : ''}>
-            {e.villain.imageUrl && <img src={e.villain.imageUrl} alt={e.villain.name} className="w-full h-full object-contain" />}
+            {e.villain.imageUrl && <img src={e.villain.imageUrl} alt={e.villain.name} className="w-full h-full object-contain" style={{imageRendering: 'pixelated'}}/>}
             <div className="absolute w-full -top-4">
                 <div className="h-2 bg-gray-800"><div className="h-full bg-red-500" style={{width: `${(e.health/e.maxHealth)*100}%`}}></div></div>
             </div>
         </Sprite>)}
 
-        {turrets.map(t => <Sprite key={t.id} entity={t} color="bg-gray-600 border-2 border-gray-400" />)}
+        {turrets.map(t => <Sprite key={t.id} entity={t} color="bg-metal-pattern border-2 border-gray-400" />)}
 
         {bullets.map(b => <Sprite key={b.id} entity={b} color={b.owner === 'player' ? 'bg-yellow-400 rounded-full' : 'bg-pink-500 rounded-full'} />)}
         
         {explosions.map(e => <div key={e.id} className="absolute bg-orange-500 rounded-full explosion-anim" style={{left:e.x - e.width/2, top:e.y-e.height/2, width:e.width, height:e.height}}></div>)}
         
-        <div className="absolute bottom-0 left-0 w-full h-12 bg-gray-800/50"></div>
+        <div className="absolute bottom-0 left-0 w-full h-12 bg-gray-900/80 backdrop-blur-sm border-t-2 border-gray-600"></div>
 
-        <div className="absolute top-2 left-2 text-white text-xl uppercase">Score: {score}</div>
-        <div className="absolute top-2 right-2 text-white text-xl uppercase">Level: {levelIndex + 1} / {levels.length}</div>
+        <div className="absolute top-2 left-2 text-white text-xl uppercase drop-shadow-md">Score: {score}</div>
+        <div className="absolute top-2 right-2 text-white text-xl uppercase drop-shadow-md">Level: {levelIndex + 1} / {levels.length}</div>
+        
+        {boss && (
+            <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-[60%] flex flex-col items-center z-20">
+                <h3 className="text-red-500 font-bold uppercase text-lg mb-1 drop-shadow-md tracking-widest">{boss.villain.name}</h3>
+                <div className="w-full h-4 bg-gray-900 border-2 border-gray-500 shadow-lg">
+                    <div className="h-full bg-red-600 transition-all duration-100" style={{ width: `${Math.max(0, (boss.health / boss.maxHealth) * 100)}%` }}></div>
+                </div>
+            </div>
+        )}
 
-        <div className="absolute bottom-2 left-2 text-white flex items-center gap-4">
+        <div className="absolute bottom-2 left-2 text-white flex items-center gap-4 z-10">
             <div>
-                <div className="text-lg uppercase">{player.hero.name} <span className='text-sm text-yellow-300'>x{player.lives}</span></div>
+                <div className="text-lg uppercase drop-shadow-md">{player.hero.name} <span className='text-sm text-yellow-300'>x{player.lives}</span></div>
                 <div className="w-48 h-4 bg-gray-700 border-2 border-gray-400">
                     <div className="h-full bg-green-500 transition-all duration-200" style={{width: `${(player.health/player.maxHealth)*100}%`}}></div>
                 </div>
             </div>
             <div className="text-center">
-                <div className="text-sm uppercase">Special (E)</div>
+                <div className="text-sm uppercase drop-shadow-md">Special (E)</div>
                  <div className="w-24 h-4 bg-gray-700 border-2 border-gray-400">
                     <div className="h-full bg-purple-500" style={{width: `${100 - (player.specialAbilityCooldown/C.SPECIAL_ABILITY_COOLDOWN)*100}%`}}></div>
                 </div>

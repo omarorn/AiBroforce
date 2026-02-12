@@ -1,21 +1,22 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import type { CharacterProfile } from '../types';
-import { generateCharacterImage } from '../services/geminiService';
+import { generateCharacterImage, generateCharacterVideo } from '../services/geminiService';
 import { audioService } from '../services/audioService';
 import Button from './ui/Button';
 import RotatingLoader from './ui/RotatingLoader';
 import Input from './ui/Input';
-import { IoVolumeHighOutline } from 'react-icons/io5';
+import { IoVolumeHighOutline, IoVideocamOutline, IoImageOutline } from 'react-icons/io5';
 
 interface InteractiveCharacterViewerProps {
     imageUrl: string | null;
+    videoUrl: string | null;
     altText: string;
     isGenerating: boolean;
     savedImages: string[];
 }
 
-const InteractiveCharacterViewer: React.FC<InteractiveCharacterViewerProps> = ({ imageUrl, altText, isGenerating, savedImages }) => {
+const InteractiveCharacterViewer: React.FC<InteractiveCharacterViewerProps> = ({ imageUrl, videoUrl, altText, isGenerating, savedImages }) => {
     const [style, setStyle] = useState<React.CSSProperties>({});
     const [sheenStyle, setSheenStyle] = useState<React.CSSProperties>({});
 
@@ -47,7 +48,7 @@ const InteractiveCharacterViewer: React.FC<InteractiveCharacterViewerProps> = ({
         setSheenStyle({ background: 'transparent' });
     };
 
-    const hasImage = !!imageUrl;
+    const hasContent = !!imageUrl || !!videoUrl;
 
     return (
         <div 
@@ -57,13 +58,24 @@ const InteractiveCharacterViewer: React.FC<InteractiveCharacterViewerProps> = ({
             onMouseLeave={handleMouseLeave}
         >
             <div className="relative w-full h-full transform-style-3d" style={style}>
-                <div className="absolute inset-0 bg-gray-900 border-4 border-gray-600 flex items-center justify-center">
+                <div className="absolute inset-0 bg-gray-900 border-4 border-gray-600 flex items-center justify-center overflow-hidden">
                     {isGenerating ? (
                         <RotatingLoader images={savedImages} size="lg" />
-                    ) : !hasImage ? (
+                    ) : !hasContent ? (
                         <span className="text-gray-500 text-6xl">?</span>
-                    ) : null}
-                    {!isGenerating && hasImage && <img src={imageUrl!} alt={altText} className="w-full h-full object-contain" />}
+                    ) : videoUrl ? (
+                         <video 
+                             src={videoUrl} 
+                             className="w-full h-full object-cover" 
+                             autoPlay 
+                             loop 
+                             muted 
+                             playsInline 
+                             controls={false}
+                         />
+                    ) : (
+                        <img src={imageUrl!} alt={altText} className="w-full h-full object-contain" />
+                    )}
                 </div>
                 <div className="absolute inset-0" style={sheenStyle}></div>
             </div>
@@ -84,13 +96,16 @@ const CharacterProfileScreen: React.FC<CharacterProfileScreenProps> = ({ charact
   const [error, setError] = useState<string | null>(null);
   const [internalCharacter, setInternalCharacter] = useState<CharacterProfile>(character);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [videoPrompt, setVideoPrompt] = useState(`Cinematic action shot of ${character.name}, ${character.description}, 8-bit style.`);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleGenerateImage = async () => {
     setIsGenerating(true);
     setError(null);
     try {
       const imageUrl = await generateCharacterImage(internalCharacter);
-      const updatedCharacter = { ...internalCharacter, imageUrl };
+      const updatedCharacter = { ...internalCharacter, imageUrl, videoUrl: undefined }; // Clear video if new image gen
       setInternalCharacter(updatedCharacter);
       setHasUnsavedChanges(true);
     } catch (e) {
@@ -100,11 +115,44 @@ const CharacterProfileScreen: React.FC<CharacterProfileScreenProps> = ({ charact
       setIsGenerating(false);
     }
   };
+
+  const handleGenerateVideo = async () => {
+    if (!internalCharacter.imageUrl) {
+        setError("An image is required to animate.");
+        return;
+    }
+    setIsGenerating(true);
+    setError(null);
+    try {
+        const videoUrl = await generateCharacterVideo(internalCharacter.imageUrl, videoPrompt);
+        const updatedCharacter = { ...internalCharacter, videoUrl };
+        setInternalCharacter(updatedCharacter);
+        setHasUnsavedChanges(true);
+    } catch (e: any) {
+        console.error(e);
+        setError(`Failed to animate: ${e.message}`);
+    } finally {
+        setIsGenerating(false);
+    }
+  };
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setInternalCharacter(prev => ({ ...prev!, [name]: value }));
     setHasUnsavedChanges(true);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              const base64String = reader.result as string;
+              setInternalCharacter(prev => ({...prev, imageUrl: base64String, videoUrl: undefined }));
+              setHasUnsavedChanges(true);
+          };
+          reader.readAsDataURL(file);
+      }
   };
 
   const handleSave = () => {
@@ -125,10 +173,44 @@ const CharacterProfileScreen: React.FC<CharacterProfileScreenProps> = ({ charact
         
         <InteractiveCharacterViewer 
             imageUrl={internalCharacter.imageUrl || null}
+            videoUrl={internalCharacter.videoUrl || null}
             altText={internalCharacter.name}
             isGenerating={isGenerating}
             savedImages={savedImages}
         />
+
+        {/* Media Controls */}
+        <div className="flex flex-wrap justify-center gap-2 mb-6">
+             <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleImageUpload} 
+                className="hidden" 
+                accept="image/*"
+             />
+             <Button onClick={() => fileInputRef.current?.click()} className="!py-2 !px-3 !text-xs !bg-blue-600 flex items-center gap-1" disabled={isGenerating}>
+                 <IoImageOutline /> Upload Photo
+             </Button>
+             <Button onClick={handleGenerateImage} className="!py-2 !px-3 !text-xs !bg-purple-600 flex items-center gap-1" disabled={isGenerating}>
+                Gen Portrait
+             </Button>
+             <Button onClick={handleGenerateVideo} className="!py-2 !px-3 !text-xs !bg-green-600 flex items-center gap-1" disabled={isGenerating || !internalCharacter.imageUrl}>
+                <IoVideocamOutline /> Animate (Veo)
+             </Button>
+        </div>
+        
+        {/* Video Prompt Input (Only visible if animating is possible) */}
+        {internalCharacter.imageUrl && (
+            <div className="mb-4 text-left">
+                <label className="text-[10px] font-bold text-gray-400 block mb-1 uppercase tracking-wider">Animation Prompt</label>
+                <Input 
+                    value={videoPrompt} 
+                    onChange={(e) => setVideoPrompt(e.target.value)} 
+                    className="!py-1 !px-2 !text-xs !border-gray-700 focus:!border-green-500"
+                    placeholder="Describe how the character should move..."
+                />
+            </div>
+        )}
 
         <div className="bg-gray-900/50 p-4 space-y-4 text-left">
             <div>
@@ -172,15 +254,12 @@ const CharacterProfileScreen: React.FC<CharacterProfileScreenProps> = ({ charact
             </div>
         </div>
         
-        {error && <p className="text-red-500 my-4">{error}</p>}
+        {error && <p className="text-red-500 my-4 text-sm bg-red-900/20 p-2 border border-red-500">{error}</p>}
         
-        <div className="flex justify-center gap-4 mt-6">
-            <Button onClick={onBack}>Back</Button>
-            <Button onClick={handleGenerateImage} disabled={isGenerating}>
-                {isGenerating ? 'Generating...' : 'Generate Portrait'}
-            </Button>
+        <div className="flex justify-center gap-4 mt-6 border-t border-gray-700 pt-6">
+            <Button onClick={onBack} className="!bg-gray-600">Back</Button>
             <Button onClick={handleSave} disabled={isGenerating || !hasUnsavedChanges}>
-                Save
+                Save Changes
             </Button>
         </div>
       </div>

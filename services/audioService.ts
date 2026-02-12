@@ -1,4 +1,5 @@
 
+
 class AudioService {
   private audioContext: AudioContext | null = null;
   private masterGain: GainNode | null = null;
@@ -54,7 +55,7 @@ class AudioService {
   // --- Procedural Sound Generators (8-bit style) ---
 
   // Generic Tone Generator
-  private playTone(freq: number, type: OscillatorType, duration: number, startTime: number = 0, slideFreq: number | null = null) {
+  public playTone(freq: number, type: OscillatorType, duration: number, startTime: number = 0, slideFreq: number | null = null) {
       if (!this.audioContext || !this.masterGain) return;
       const osc = this.audioContext.createOscillator();
       const gain = this.audioContext.createGain();

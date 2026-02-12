@@ -1,3 +1,4 @@
+
 export const GAME_WIDTH = 1024;
 export const GAME_HEIGHT = 576;
 
@@ -30,3 +31,7 @@ export const SPECIAL_ABILITY_COOLDOWN = 600; // 10 seconds at 60fps
 export const TURRET_LIFESPAN = 450; // 7.5 seconds
 export const TURRET_SHOOT_COOLDOWN = 45;
 export const INVINCIBILITY_DURATION = 300; // 5 seconds
+
+export const POWERUP_WIDTH = 30;
+export const POWERUP_HEIGHT = 30;
+export const POWERUP_DURATION = 900; // 15 seconds

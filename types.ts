@@ -1,8 +1,11 @@
+
 export enum GameState {
   MENU,
   PLAYING,
   GAME_OVER,
 }
+
+export type Difficulty = 'EASY' | 'NORMAL' | 'HARD';
 
 export interface CharacterProfile {
   id: number;
@@ -13,6 +16,7 @@ export interface CharacterProfile {
   movementAbility: string;
   catchphrase: string;
   imageUrl?: string;
+  videoUrl?: string;
 }
 
 export interface GeneratedCharacters {
@@ -27,13 +31,29 @@ export interface SavedCast {
   createdAt: number;
 }
 
+export interface HighScore {
+  id: string;
+  score: number;
+  heroName: string;
+  castName: string;
+  difficulty: Difficulty;
+  date: number;
+}
+
 export interface GameObject {
   id: number;
   x: number;
   y: number;
   width: number;
   height: number;
-  type: 'player' | 'enemy' | 'bullet' | 'crate' | 'explosion' | 'rescue_cage' | 'turret';
+  type: 'player' | 'enemy' | 'bullet' | 'crate' | 'explosion' | 'rescue_cage' | 'turret' | 'power_up';
+}
+
+export type PowerUpType = 'rapid_fire' | 'spread_shot' | 'damage_boost';
+
+export interface PowerUp extends GameObject {
+  type: 'power_up';
+  powerUpType: PowerUpType;
 }
 
 export interface Player extends GameObject {
@@ -51,7 +71,12 @@ export interface Player extends GameObject {
   hasDoubleJumped: boolean;
   isWallSliding: boolean;
   dashTimer: number;
+  // Upgrade state
+  activePowerUp?: PowerUpType;
+  powerUpTimer: number;
 }
+
+export type EnemyBehavior = 'patrol' | 'chase' | 'stationary' | 'boss';
 
 export interface Enemy extends GameObject {
   type: 'enemy';
@@ -63,6 +88,7 @@ export interface Enemy extends GameObject {
   shootCooldown: number;
   isBoss: boolean;
   damageFlash: number;
+  aiBehavior: EnemyBehavior;
 }
 
 export interface Bullet extends GameObject {
@@ -71,6 +97,7 @@ export interface Bullet extends GameObject {
   vx: number;
   vy: number;
   weaponType: CharacterProfile['weaponType'];
+  damage: number;
 }
 
 export interface Crate extends GameObject {
@@ -95,12 +122,13 @@ export interface Turret extends GameObject {
     direction: 'left' | 'right';
 }
 
-export type GameEntityType = Player | Enemy | Bullet | Crate | Explosion | RescueCage | Turret;
+export type GameEntityType = Player | Enemy | Bullet | Crate | Explosion | RescueCage | Turret | PowerUp;
 
 export interface LevelData {
     platforms: Array<Omit<Crate, 'id' | 'type' | 'health'>>;
     destructibleCrates: Array<Omit<Crate, 'id' | 'type' | 'health'>>;
-    enemies: Array<Omit<Enemy, 'id'| 'type' | 'villain' | 'health' | 'maxHealth' | 'damageFlash'>>;
+    // Updated to exclude aiBehavior from requirement in levels.ts
+    enemies: Array<Omit<Enemy, 'id'| 'type' | 'villain' | 'health' | 'maxHealth' | 'damageFlash' | 'aiBehavior'>>;
     cages: Array<Omit<RescueCage, 'id'|'type'|'health'>>;
-    boss?: Omit<Enemy, 'id'| 'type' | 'villain' | 'health'| 'maxHealth' | 'damageFlash'>;
+    boss?: Omit<Enemy, 'id'| 'type' | 'villain' | 'health'| 'maxHealth' | 'damageFlash' | 'aiBehavior'>;
 }
